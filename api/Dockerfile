@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
-FROM python:3.12-slim-bookworm
+FROM python:3.12-alpine
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY --from=builder /install /usr/local
 COPY main.py .
 
 # Run as non-root user
-RUN useradd --no-create-home --shell /bin/false appuser
+RUN adduser --no-create-home --disabled-password appuser
 USER appuser
 
 EXPOSE 8000
