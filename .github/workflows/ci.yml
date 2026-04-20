@@ -153,41 +153,44 @@ jobs:
           docker buildx build --load -t api:scan ./api
           docker buildx build --load -t worker:scan ./worker
           docker buildx build --load -t frontend:scan ./frontend
-        env:
-          TRIVY_IGNORE_UNFIXED: "true"
+
+      - name: Install Trivy
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
 
       - name: Scan API image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: api:scan
-          format: sarif
-          output: trivy-api.sarif
-          severity: CRITICAL
-          exit-code: "1"
-          ignore-unfixed: true
-          scanners: vuln
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --format sarif \
+            --output trivy-api.sarif \
+            api:scan
 
       - name: Scan worker image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: worker:scan
-          format: sarif
-          output: trivy-worker.sarif
-          severity: CRITICAL
-          exit-code: "1"
-          ignore-unfixed: true
-          scanners: vuln
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --format sarif \
+            --output trivy-worker.sarif \
+            worker:scan
 
       - name: Scan frontend image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: frontend:scan
-          format: sarif
-          output: trivy-frontend.sarif
-          severity: CRITICAL
-          exit-code: "1"
-          ignore-unfixed: true
-          scanners: vuln
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --format sarif \
+            --output trivy-frontend.sarif \
+            frontend:scan
 
       - name: Upload Trivy SARIF results
         uses: actions/upload-artifact@v4
