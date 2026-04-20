@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM node:18-alpine AS builder
+FROM node:18-slim AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN npm ci --omit=dev
 
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
 
