@@ -1,10 +1,9 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 import redis
 import uuid
 import os
 import time
-
-app = FastAPI()
 
 
 def connect_redis(retries=10, delay=2):
@@ -23,7 +22,18 @@ def connect_redis(retries=10, delay=2):
     raise RuntimeError("Could not connect to Redis after multiple retries")
 
 
-r = connect_redis()
+# Module-level client, initialized to None — set during app startup
+r = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global r
+    r = connect_redis()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/health")
