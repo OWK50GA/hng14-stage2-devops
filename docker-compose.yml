@@ -3,6 +3,7 @@ services:
   redis:
     image: redis:7-alpine
     command: redis-server --requirepass ${REDIS_PASSWORD}
+    restart: unless-stopped
     networks:
       - internal
     healthcheck:
@@ -19,6 +20,7 @@ services:
 
   api:
     build: ./api
+    restart: unless-stopped
     environment:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
@@ -43,6 +45,7 @@ services:
 
   worker:
     build: ./worker
+    restart: unless-stopped
     environment:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
@@ -60,6 +63,7 @@ services:
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     environment:
       API_URL: ${API_URL}
       PORT: ${FRONTEND_PORT}
