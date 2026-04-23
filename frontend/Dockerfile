@@ -13,6 +13,9 @@ FROM node:18-slim
 
 WORKDIR /app
 
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Copy installed node_modules from builder
 COPY --from=builder /app/node_modules ./node_modules
 
@@ -27,6 +30,6 @@ USER appuser
 EXPOSE 3000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+    CMD curl -f http://localhost:3000/health || exit 1
 
 CMD ["node", "app.js"]

@@ -275,50 +275,53 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST || 'redis' }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || '6379' }}
+          API_URL: ${{ secrets.API_URL || 'http://api:8000' }}
+          FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3000' }}
+          APP_ENV: ${{ secrets.APP_ENV || 'production' }}
         run: |
           echo "$DEPLOY_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
-          ssh -i /tmp/deploy_key \
-              -o StrictHostKeyChecking=no \
-              $DEPLOY_USER@$DEPLOY_HOST \
-              "SHA=${{ github.sha }} REDIS_PASSWORD=$REDIS_PASSWORD bash -s" << 'ENDSSH'
+          # Write the remote script to a temp file to avoid heredoc quoting issues
+          cat > /tmp/deploy.sh << SCRIPT
+          set -e
+          cd ~/app
+          git pull origin main
 
-            set -e
-            cd ~/app
+          # Write .env with production values
+          printf 'REDIS_PASSWORD=%s\nREDIS_HOST=%s\nREDIS_PORT=%s\nAPI_URL=%s\nFRONTEND_PORT=%s\nAPP_ENV=%s\n' \
+            "\$REDIS_PASSWORD" "\$REDIS_HOST" "\$REDIS_PORT" "\$API_URL" "\$FRONTEND_PORT" "\$APP_ENV" > .env
 
-            # Pull latest code
-            git pull origin main
-
-            # Rolling update for each service
-            for SERVICE in api worker frontend; do
-              echo "Rolling update: $SERVICE"
-              OLD_CONTAINER=$(docker compose ps -q $SERVICE 2>/dev/null || true)
-
-              # Start new container alongside old one
-              docker compose up -d --no-deps --build $SERVICE
-
-              # Wait up to 60s for new container to be healthy
-              NEW_CONTAINER=$(docker compose ps -q $SERVICE)
-              ELAPSED=0
-              while [ $ELAPSED -lt 60 ]; do
-                STATUS=$(docker inspect --format='{{.State.Health.Status}}' $NEW_CONTAINER 2>/dev/null || echo "starting")
-                echo "$SERVICE health: $STATUS (${ELAPSED}s)"
-                if [ "$STATUS" = "healthy" ]; then
-                  echo "$SERVICE is healthy — stopping old container"
-                  [ -n "$OLD_CONTAINER" ] && docker stop $OLD_CONTAINER || true
-                  break
-                fi
-                if [ $ELAPSED -ge 59 ]; then
-                  echo "$SERVICE health check timed out — aborting, old container left running"
-                  docker stop $NEW_CONTAINER || true
-                  [ -n "$OLD_CONTAINER" ] && docker start $OLD_CONTAINER || true
-                  exit 1
-                fi
-                sleep 5
-                ELAPSED=$((ELAPSED + 5))
-              done
+          for SERVICE in api worker frontend; do
+            echo "Rolling update: \$SERVICE"
+            OLD_CONTAINER=\$(docker compose ps -q \$SERVICE 2>/dev/null || true)
+            docker compose up -d --no-deps --build \$SERVICE
+            NEW_CONTAINER=\$(docker compose ps -q \$SERVICE)
+            ELAPSED=0
+            while [ \$ELAPSED -lt 60 ]; do
+              STATUS=\$(docker inspect --format='{{.State.Health.Status}}' \$NEW_CONTAINER 2>/dev/null || echo "starting")
+              echo "\$SERVICE health: \$STATUS (\${ELAPSED}s)"
+              if [ "\$STATUS" = "healthy" ]; then
+                echo "\$SERVICE is healthy - stopping old container"
+                [ -n "\$OLD_CONTAINER" ] && docker stop \$OLD_CONTAINER || true
+                break
+              fi
+              if [ \$ELAPSED -ge 59 ]; then
+                echo "\$SERVICE health check timed out - aborting"
+                docker stop \$NEW_CONTAINER || true
+                [ -n "\$OLD_CONTAINER" ] && docker start \$OLD_CONTAINER || true
+                exit 1
+              fi
+              sleep 5
+              ELAPSED=\$((ELAPSED + 5))
             done
+          done
+          echo "Deployment complete"
+          SCRIPT
 
-            echo "Deployment complete"
-          ENDSSH
+          # Pass REDIS_PASSWORD as env var and run the script on the server
+          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no /tmp/deploy.sh $DEPLOY_USER@$DEPLOY_HOST:/tmp/deploy.sh
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST \
+            "REDIS_PASSWORD='$REDIS_PASSWORD' REDIS_HOST='$REDIS_HOST' REDIS_PORT='$REDIS_PORT' API_URL='$API_URL' FRONTEND_PORT='$FRONTEND_PORT' APP_ENV='$APP_ENV' bash /tmp/deploy.sh"
