@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS build
 
 WORKDIR /app
 
@@ -14,13 +14,13 @@ FROM python:3.12-slim-bookworm
 WORKDIR /app
 
 # Copy installed packages from builder
-COPY --from=builder /install /usr/local
+COPY --from=build /install /usr/local
 
 # Copy application source (no .env files — config comes from env vars at runtime)
 COPY main.py .
 
 # Run as non-root user
-RUN adduser --no-create-home --disabled-password appuser
+RUN useradd --no-create-home --shell /bin/false appuser
 USER appuser
 
 EXPOSE 8000

@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM node:18-slim AS builder
+FROM node:18-slim AS build
 
 WORKDIR /app
 
@@ -14,14 +14,14 @@ FROM node:18-slim
 WORKDIR /app
 
 # Copy installed node_modules from builder
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 
 # Copy application source (no .env files — config comes from env vars at runtime)
 COPY app.js .
 COPY views/ ./views/
 
 # Run as non-root user
-RUN adduser --disabled-password --no-create-home appuser
+RUN useradd --no-create-home --shell /bin/false appuser
 USER appuser
 
 EXPOSE 3000
